@@ -1,1 +1,2 @@
--Ibazel-aoc2019/external/com_google_absl
+-I/home/craig/code/abseil-cpp
+-I/home/craig/code/aoc2019

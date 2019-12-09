@@ -11,3 +11,13 @@ cc_library(
         "@com_google_absl//absl/base",
     ],
 )
+
+cc_library(
+    name = "intcode",
+    hdrs = ["intcode.h"],
+    srcs = ["intcode.cc"],
+    deps = [
+        "@com_google_absl//absl/strings",
+        ":check",
+    ],
+)

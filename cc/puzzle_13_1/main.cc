@@ -1,4 +1,8 @@
+#include <termios.h>
+#include <unistd.h>
+
 #include <cstdint>
+#include <cstdio>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -8,6 +12,18 @@
 #include "cc/util/intcode.h"
 
 namespace {
+
+int getch(void) {
+  termios oldattr, newattr;
+  int ch;
+  tcgetattr(STDIN_FILENO, &oldattr);
+  newattr = oldattr;
+  newattr.c_lflag &= ~( ICANON | ECHO );
+  tcsetattr(STDIN_FILENO, TCSANOW, &newattr);
+  ch = std::getchar();
+  tcsetattr(STDIN_FILENO, TCSANOW, &oldattr);
+  return ch;
+}
 
 class ArcadeMachine {
  public:
@@ -38,9 +54,7 @@ class ArcadeMachine {
 
       while (result.state ==
              aoc2019::IntcodeMachine::ExecState::kPendingInput) {
-        char input;
-        std::cin >> input;
-        switch (input) {
+        switch (getch()) {
           case 'a':
             cpu_.PushInputs({-1});
             break;

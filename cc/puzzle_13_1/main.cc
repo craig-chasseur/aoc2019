@@ -30,7 +30,8 @@ class ArcadeMachine {
   explicit ArcadeMachine(std::vector<std::int64_t> program)
       : cpu_(std::move(program)) {}
 
-  void Run() {
+  std::deque<std::int64_t> Run(std::deque<std::int64_t> moves) {
+    cpu_.PushInputs(moves);
     aoc2019::IntcodeMachine::RunResult result;
     do {
       result = cpu_.Run();
@@ -56,12 +57,15 @@ class ArcadeMachine {
              aoc2019::IntcodeMachine::ExecState::kPendingInput) {
         switch (getch()) {
           case 'a':
+            moves.push_back(-1);
             cpu_.PushInputs({-1});
             break;
           case 's':
+            moves.push_back(0);
             cpu_.PushInputs({0});
             break;
           case 'd':
+            moves.push_back(1);
             cpu_.PushInputs({1});
             break;
           default:
@@ -70,6 +74,9 @@ class ArcadeMachine {
         break;
       }
     } while (result.state != aoc2019::IntcodeMachine::ExecState::kHalt);
+
+    std::cout << "FINAL SCORE: " << score_ << "\n";
+    return moves;
   }
 
  private:
@@ -139,7 +146,18 @@ int main(int argc, char** argv) {
   }
   std::vector<std::int64_t> program = aoc2019::ReadIntcodeProgram(argv[1]);
   program[0] = 2;
-  ArcadeMachine machine(std::move(program));
-  machine.Run();
+  std::deque<std::int64_t> saved_moves;
+  for (;;) {
+    ArcadeMachine machine(program);
+    saved_moves = machine.Run(std::move(saved_moves));
+    std::cout << "Rewind moves? ";
+    int num_moves;
+    std::cin >> num_moves;
+    if (num_moves <= 0) break;
+    while (num_moves > 0 && !saved_moves.empty()) {
+      saved_moves.pop_back();
+      --num_moves;
+    }
+  }
   return 0;
 }

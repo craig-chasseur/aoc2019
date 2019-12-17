@@ -29,6 +29,8 @@ class IntcodeMachine {
 
   void RunWithConsoleIO();
 
+  void RunWithAsciiConsoleIO();
+
   void PushInputs(const std::deque<std::int64_t>& inputs);
 
  private:

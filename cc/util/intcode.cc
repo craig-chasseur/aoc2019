@@ -94,6 +94,27 @@ void IntcodeMachine::RunWithConsoleIO() {
   } while (result.state != ExecState::kHalt);
 }
 
+void IntcodeMachine::RunWithAsciiConsoleIO() {
+  RunResult result;
+  do {
+    result = Run();
+    for (const std::int64_t val : result.outputs) {
+      if (val >= 0 && val < 128) {
+        std::cout << static_cast<char>(val);
+      } else {
+        std::cout << "Non printable: " << val << "\n";
+      }
+    }
+    std::cout.flush();
+    if (result.state == ExecState::kPendingInput) {
+      std::string inputstr;
+      std::cin >> inputstr;
+      if (inputstr.back() != '\n') inputstr.push_back('\n');
+      PushInputs(std::deque<std::int64_t>(inputstr.begin(), inputstr.end()));
+    }
+  } while (result.state != ExecState::kHalt);
+}
+
 void IntcodeMachine::PushInputs(const std::deque<std::int64_t>& inputs) {
   queued_inputs_.insert(queued_inputs_.end(), inputs.begin(), inputs.end());
 }

@@ -1,0 +1,8 @@
+Day 10, Part 2: Order of vaporization has some bugs, but it's close enough to
+make an educated guess.
+
+Day 13, Part 2: Have to actually play the game to the end (with rewind device)
+to get final score.
+
+Day 17, Part 2: Program outputs the best path, but still need to manually
+figure out the optimal movement program.

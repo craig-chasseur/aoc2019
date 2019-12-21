@@ -108,7 +108,7 @@ void IntcodeMachine::RunWithAsciiConsoleIO() {
     std::cout.flush();
     if (result.state == ExecState::kPendingInput) {
       std::string inputstr;
-      std::cin >> inputstr;
+      std::getline(std::cin, inputstr);
       if (inputstr.back() != '\n') inputstr.push_back('\n');
       PushInputs(std::deque<std::int64_t>(inputstr.begin(), inputstr.end()));
     }

@@ -4,7 +4,6 @@ cc_binary(
     name = "main",
     srcs = ["main.cc"],
     deps = [
-        "//cc/util:check",
         "//cc/util:intcode",
     ],
 )

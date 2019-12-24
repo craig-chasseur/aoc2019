@@ -6,9 +6,45 @@
 #include <utility>
 #include <vector>
 
+#include "absl/numeric/int128.h"
 #include "cc/util/check.h"
 
 namespace {
+
+// Basic modular arithmetic routines.
+// ----------------------------------
+
+std::int64_t SafeTruncate(const absl::int128& bigval) {
+  CHECK(absl::Int128High64(bigval) == 0);
+  return absl::Int128Low64(bigval);
+}
+
+std::int64_t ModMul(std::int64_t a, std::int64_t b, std::int64_t mod) {
+  absl::int128 res = (absl::int128(a) * absl::int128(b)) % absl::int128(mod);
+  if (res < 0) res += mod;
+  return SafeTruncate(res);
+}
+
+std::int64_t ModularInverse(std::int64_t a, std::int64_t b) {
+  if (b == 1) return 1;
+  std::int64_t b_init = b;
+  std::int64_t x0 = 0;
+  std::int64_t x1 = 1;
+  while (a > 1) {
+    std::int64_t q = a / b;
+    std::int64_t tmp = b;
+    b = a % b;
+    a = tmp;
+    tmp = x0;
+    x0 = x1 - q * x0;
+    x1 = tmp;
+  }
+  if (x1 < 0) x1 += b_init;
+  return x1;
+}
+
+// Command descriptions.
+// ---------------------
 
 struct Command {
   enum class Type {
@@ -44,42 +80,73 @@ std::vector<Command> LoadShuffleCommands(const char* filename) {
   return commands;
 }
 
-std::int64_t ReverseDealIntoNewStack(std::int64_t num_cards, std::int64_t pos) {
-  return num_cards - pos - 1;
-}
+// Linear algebra.
+// ---------------
 
-std::int64_t ReverseCut(std::int64_t num_cards, int n, std::int64_t pos) {
-  pos += n;
-  if (pos < 0) return num_cards + pos;
-  return pos % num_cards;
-}
+// Coefficients of a linear polynomial: f(x) = a*x + b
+struct Coefficients {
+  std::int64_t a = 0;
+  std::int64_t b = 0;
 
-std::int64_t ReverseDealWithIncrement(
-    std::int64_t num_cards, const int n, std::int64_t pos) {
-  while (pos % n != 0) {
-    pos += num_cards;
+  std::int64_t EvalPolynomial(const std::int64_t x,
+                              const std::int64_t mod) const {
+    return (ModMul(a, x, mod) + b) % mod;
   }
-  return pos / n;
+};
+
+Coefficients ReverseDealIntoNewStack(Coefficients coeff,
+                                     std::int64_t num_cards) {
+  coeff.a = -coeff.a;
+  coeff.b = num_cards - coeff.b - 1;
+  return coeff;
 }
 
-std::int64_t ReverseShuffleCommand(std::int64_t num_cards, std::int64_t pos,
+Coefficients ReverseCut(Coefficients coeff, int n, std::int64_t num_cards) {
+  coeff.b = (coeff.b + n) % num_cards;
+  return coeff;
+}
+
+Coefficients ReverseDealWithIncrement(Coefficients coeff, int n,
+                                      std::int64_t num_cards) {
+  const std::int64_t inv = ModularInverse(n, num_cards);
+  coeff.a = ModMul(coeff.a, inv, num_cards);
+  coeff.b = ModMul(coeff.b, inv, num_cards);
+  return coeff;
+}
+
+Coefficients ReverseShuffleCommand(Coefficients coeff, std::int64_t num_cards,
                                    Command command) {
   switch (command.type) {
     case Command::Type::kDealIntoNewStack:
-      return ReverseDealIntoNewStack(num_cards, pos);
+      return ReverseDealIntoNewStack(coeff, num_cards);
     case Command::Type::kCut:
-      return ReverseCut(num_cards, command.n, pos);
+      return ReverseCut(coeff, command.n, num_cards);
     case Command::Type::kDealWithIncrement:
-      return ReverseDealWithIncrement(num_cards, command.n, pos);
+      return ReverseDealWithIncrement(coeff, command.n, num_cards);
   }
 }
 
-std::int64_t ReverseCommandSequence(std::int64_t num_cards, std::int64_t pos,
+Coefficients ReverseCommandSequence(Coefficients coeff, std::int64_t num_cards,
                                     const std::vector<Command>& commands) {
   for (auto cmd_it = commands.rbegin(); cmd_it != commands.rend(); ++cmd_it) {
-    pos = ReverseShuffleCommand(num_cards, pos, *cmd_it);
+    coeff = ReverseShuffleCommand(coeff, num_cards, *cmd_it);
   }
-  return pos;
+  return coeff;
+}
+
+// Raises the polynomial 'base' to the power 'exp' modulo 'mod'.
+Coefficients ModExp(Coefficients base, std::int64_t exp, std::int64_t mod) {
+  if (exp == 0) {
+    return {1, 0};
+  }
+  if ((exp & 0x1) == 0) {
+    return ModExp(Coefficients{ModMul(base.a, base.a, mod),
+                               (ModMul(base.a, base.b, mod) + base.b) % mod},
+                  exp >> 1, mod);
+  }
+  Coefficients tmp = ModExp(base, exp - 1, mod);
+  return {ModMul(base.a, tmp.a, mod),
+          (ModMul(base.a, tmp.b, mod) + base.b) % mod};
 }
 
 }  // namespace
@@ -95,11 +162,14 @@ int main(int argc, char** argv) {
 
   std::vector<Command> commands = LoadShuffleCommands(argv[1]);
 
-  std::int64_t pos = 2020;
-  for (std::int64_t i = 0; i < kNumShuffles; ++i) {
-    pos = ReverseCommandSequence(kNumCards, pos, commands);
-  }
+  // Compose all the commands (in reverse order) into a single polynomial.
+  Coefficients coeff = ReverseCommandSequence({1, 0}, kNumCards, commands);
 
-  std::cout << pos << "\n";
+  // Raise the polynomial to 'kNumShuffles' power for repeated application.
+  Coefficients exp_coeff = ModExp(coeff, kNumShuffles, kNumCards);
+
+  // Evaluate polynomial to find the backtracked card at position 2020.
+  std::cout << exp_coeff.EvalPolynomial(2020, kNumCards) << "\n";
+
   return 0;
 }
